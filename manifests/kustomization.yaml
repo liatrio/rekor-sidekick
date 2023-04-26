@@ -8,6 +8,18 @@ secretGenerator:
   options:
     disableNameSuffixHash: true
 
+replacements:
+- source:
+    kind: Secret
+  targets:
+  - select:
+      kind: Deployment
+    fieldPaths:
+    - .metadata.annotations.[secret.reloader.stakater.com/reload]
+    - .spec.template.spec.volumes.[name=config].secret.secretName
+    options:
+      create: true
+
 images:
 - name: rekor-sidekick
   newName: blairdrummond/rekor-sidekick
