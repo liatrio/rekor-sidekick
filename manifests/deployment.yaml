@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rekor-sidekick
+  labels:
+    app: rekor-sidekick
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rekor-sidekick
+  template:
+    metadata:
+      labels:
+        app: rekor-sidekick
+    spec:
+      containers:
+      - name: rekor-sidekick
+        image: rekor-sidekick
+        volumeMounts:
+        - name: config
+          mountPath: /etc/rekor-sidekick
+          readOnly: true
+    volumes:
+      - name: config
+        secret:
+          secretName: rekor-sidekick-config

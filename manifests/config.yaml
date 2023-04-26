@@ -1,0 +1,24 @@
+# server: https://rekor.sigstore.dev
+server: http://rekor-server
+
+# Omit or set to -1 to tail the Rekor log
+index: 0
+
+logging:
+  level: error
+
+policies:
+- name: allow-all
+  description: |-
+    Alerts on all entries
+  body: |
+    package sidekick
+    default alert = true
+
+outputs:
+  opensearch:
+    server: https://opensearch-cluster-master:9200
+    insecure: true
+    index: rekor-all
+    username: admin
+    password: admin

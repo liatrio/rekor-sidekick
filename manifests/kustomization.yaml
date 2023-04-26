@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+secretGenerator:
+- name: rekor-sidekick-config
+  files:
+  - config.yaml
+  options:
+    disableNameSuffixHash: true
+
+images:
+- name: rekor-sidekick
+  newName: blairdrummond/rekor-sidekick
+  digest: sha256:879abe45d589972078b070a7e387fcbe6f5753e43f37b9b38fe7f8b9908d4b6e
+
+resources:
+- deployment.yaml

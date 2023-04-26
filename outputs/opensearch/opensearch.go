@@ -3,6 +3,7 @@ package opensearch
 import (
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,8 @@ import (
 	opensearch "github.com/opensearch-project/opensearch-go"
 	opensearchapi "github.com/opensearch-project/opensearch-go/opensearchapi"
 )
+
+const addAttestation = true
 
 const (
 	driverName = `opensearch`
@@ -48,11 +51,17 @@ func searchify(e rekor.LogEntry) (*strings.Reader, string, error) {
 	var entry map[string]interface{}
 	json.Unmarshal(data, &entry)
 
-	// flatten the map
-	entry = flatten(entry)
 	url := entry["URL"].(string)
 	slice := strings.Split(url, "/")
 	entryId := slice[len(slice)-1]
+
+	// Optional, add the real attestation data
+	if addAttestation {
+		realdata, err := getAttestation(url)
+		if err == nil {
+			entry["attestation"] = realdata
+		}
+	}
 
 	b, err := json.Marshal(entry)
 	if err != nil {
@@ -62,23 +71,66 @@ func searchify(e rekor.LogEntry) (*strings.Reader, string, error) {
 	return strings.NewReader(string(b)), entryId, nil
 }
 
-// https://stackoverflow.com/a/39625223
-// Flatten takes a map and returns a new one where nested maps are replaced
-// by dot-delimited keys.
-func flatten(m map[string]interface{}) map[string]interface{} {
-	o := make(map[string]interface{})
-	for k, v := range m {
-		switch child := v.(type) {
-		case map[string]interface{}:
-			nm := flatten(child)
-			for nk, nv := range nm {
-				o[k+"."+nk] = nv
-			}
-		default:
-			o[k] = v
-		}
+func getAttestation(url string) (map[string]interface{}, error) {
+
+	// TODO: This is really the rekor client,
+	// but I don't want to redo the plumbing
+	client := &http.Client{}
+	req, err := http.NewRequest(`GET`, url, nil)
+	if err != nil {
+		return nil, err
 	}
-	return o
+	req.Header.Set(`Accept`, `application/json`)
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	// No such entry? This shouldn't happen.
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, rekor.ErrEntryDoesntExist
+	}
+
+	// Extract the base64 decoded body.
+	// Json decode -> base64 decode
+	entryMap := make(map[string]interface{})
+
+	err = json.NewDecoder(resp.Body).Decode(&entryMap)
+	if err != nil {
+		return nil, err
+	}
+
+	// There's only one entry, but we don't know what it is
+	// We want: uuid.attestation.data | @base64d
+	for _, v := range entryMap {
+		// uuid.attestation
+		body := v.(map[string]interface{})
+		attestation, ok := body["attestation"]
+		if !ok {
+			return nil, fmt.Errorf("no attestation in body")
+		}
+
+		// uuid.attestation.data
+		data, ok := attestation.(map[string]interface{})["data"]
+		if !ok {
+			return nil, fmt.Errorf("no data in the attestation")
+		}
+
+		// uuid.attestation.data | @base64d
+		datab64 := data.(string)
+		sDec, err := base64.StdEncoding.DecodeString(datab64)
+		if err != nil {
+			return nil, err
+		}
+
+		var unpacked map[string]interface{}
+		json.Unmarshal(sDec, &unpacked)
+
+		// Done!
+		return unpacked, nil
+	}
+	return nil, fmt.Errorf("empty map")
 }
 
 func (d *driver) Send(e outputs.Event) error {
