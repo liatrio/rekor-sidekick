@@ -1,0 +1,3 @@
+TODO: Remove the secret values from the secret
+Probably will use external secrets + reloader to
+sync the opensearch secret into the config yaml
