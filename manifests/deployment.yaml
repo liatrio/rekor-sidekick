@@ -21,7 +21,7 @@ spec:
         - name: config
           mountPath: /etc/rekor-sidekick
           readOnly: true
-    volumes:
-      - name: config
-        secret:
-          secretName: rekor-sidekick-config
+      volumes:
+        - name: config
+          secret:
+            secretName: rekor-sidekick-config
