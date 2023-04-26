@@ -5,7 +5,7 @@ server: http://rekor-server
 index: 0
 
 logging:
-  level: error
+  level: trace
 
 policies:
 - name: allow-all
